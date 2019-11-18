@@ -48,6 +48,7 @@
 , remarshal
 , crateDependencies
 , zstd
+, fetchurl
 }:
 
 with
@@ -222,7 +223,7 @@ let
   # file that cargo itself uses to double check the sha256
   unpackCrate = name: version: sha256:
     with
-    { crate = builtins.fetchurl
+    { crate = fetchurl
         { url = "https://crates.io/api/v1/crates/${name}/${version}/download";
           inherit sha256;
         };

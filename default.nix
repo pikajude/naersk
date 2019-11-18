@@ -10,6 +10,7 @@
 , cargo
 , rustc
 , zstd
+, fetchurl
 }:
 
 let
@@ -27,7 +28,9 @@ let
           symlinkJoin
           cargo
           rustc
-          zstd;
+          zstd
+          fetchurl
+          ;
       };
   builtinz =
       builtins //
