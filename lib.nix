@@ -114,44 +114,33 @@ rec
   dummySrc' =
     { src
     , name
-    , keepMembers ? []
+    , keepMembers
     }:
       let
+        allCrates = cratesByPath src;
+        pathSet = builtins.partition (x: builtins.elem x.crate keepMembers)
+          (builtins.map (x: { crate = x; path = allCrates.${x}; }) (builtins.attrNames allCrates));
+        inherit (pathSet) right wrong;
         src' = builtins.filterSource
-          (path': type:
-            let
-              path = lib.removePrefix (builtins.toString src + "/") path';
-            in
+          (path: type:
             type == "directory" ||
-
-            # top-level cargo toml
-            (type == "regular" && path == "Cargo.toml") ||
-
-            # nested cargo tomls
-            (type == "regular" && lib.hasSuffix "/Cargo.toml" path) ||
-
-            # looks like this works without cargo.lock as well. why?
-            (type == "regular" && path == "Cargo.lock") ||
-
+            (builtins.baseNameOf path == "Cargo.toml") ||
+            (builtins.baseNameOf path == "Cargo.lock") ||
             (type == "regular" && path == ".cargo/config") ||
-            (builtins.any (member:
-            let
-              res = lib.hasPrefix "${member}/" path;
-            in res # builtins.trace "${member} ${path} ${builtins.toJSON res}" res
-            ) keepMembers)
+
+            (builtins.any (right: lib.hasPrefix (builtins.toString right.path) path) right
+              && builtins.all (wrong: !(lib.hasPrefix (builtins.toString wrong.path) path)) wrong)
           )
           src;
 
-      in
+      in src';
+      /*
       runCommand "stripped-src-${name}" {}
         ''
           mkdir -p $out
-          ${tree}/bin/tree ${src'}
           cp -r ${src'}/* $out
 
           chmod +w -R $out
-
-          echo "KEEPING MEMBERS ${builtins.toJSON keepMembers}"
 
           pushd $out
           for memberdir in $(find . -name 'Cargo.toml'); do
@@ -169,6 +158,7 @@ rec
           done
           popd
         '';
+        */
 
   # A very minimal 'src' which makes cargo happy nonetheless
   dummySrc =
@@ -273,4 +263,23 @@ rec
       components = lib.splitString " " str;
     in
       { name = lib.elemAt components 0; version = lib.elemAt components 1; };
+
+  cratesByPath = dir:
+    let
+      dirStructure = builtins.genericClosure {
+        startSet = [ { key = "."; path = dir; type = "directory"; crate = null; } ];
+        operator = entry: (if entry.type == "directory"
+          then let diritems = (builtins.readDir entry.path);
+            in builtins.map (entryname: {
+              key = "${entry.key}/${entryname}";
+              path = entry.path + "/${entryname}";
+              type = diritems.${entryname};
+              crate = if entryname == "Cargo.toml"
+                then (builtins.fromTOML (builtins.readFile (entry.path + "/${entryname}"))).package.name or null
+                else null;
+            }) (builtins.attrNames diritems)
+          else []);
+      };
+      withCrates = builtins.filter (x: x.crate != null) dirStructure;
+    in builtins.listToAttrs (map (c: { name = c.crate; value = builtins.dirOf c.path; }) withCrates);
 }

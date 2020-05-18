@@ -119,4 +119,4 @@ let
     in
       buildTopLevel;
 in
-{ inherit buildPackage; }
+{ inherit buildPackage; lib = libb; }

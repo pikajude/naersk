@@ -45,7 +45,6 @@ let
   fastTests =
     rec
     {
-
       readme = pkgs.runCommand "readme-gen" {}
         ''
           cat ${./README.tpl.md} > $out
